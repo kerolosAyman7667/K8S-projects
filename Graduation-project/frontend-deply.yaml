@@ -27,6 +27,10 @@ spec:
       containers:
       - image: bridgex/frontend:1.0
         name: frontend
+        readinessProbe:
+          httpGet:
+            port: 80
+            path: /
         imagePullPolicy: Always
         ports:
         - containerPort: 80
