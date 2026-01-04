@@ -21,6 +21,12 @@ spec:
         app: backend-deploy
     spec:
       volumes:
+      - name: vault-sec
+        csi:
+          driver: 'secrets-store.csi.k8s.io'
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: 'backend-secret-vault'
       - name: files-app
         persistentVolumeClaim:
           claimName: backend-app-pvc
@@ -29,7 +35,7 @@ spec:
           claimName: backend-docs-pvc
       - name: keys
         secret:
-          secretName: backend-secret
+          secretName: backend-vault-synced-secret 
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
@@ -61,6 +67,9 @@ spec:
         volumeMounts:
         - name: files-app
           mountPath: /app
+        - name: 'vault-sec'
+          mountPath: '/mnt/secrets-store'
+          readOnly: true
       containers:
       - image: bridgex/backend:39
         name: backend
@@ -73,6 +82,9 @@ spec:
             port: 8000
           initialDelaySeconds: 5
         volumeMounts:
+          - name: 'vault-sec'
+            mountPath: '/mnt/secrets-store'
+            readOnly: true
           - mountPath: /app/files
             name: files-app
           - mountPath: /app/docs
@@ -93,7 +105,7 @@ spec:
           - configMapRef:
               name: backend-cm
           - secretRef:
-              name: backend-secret
+              name: backend-vault-synced-secret 
         resources: 
           requests:
             cpu: "0.1"

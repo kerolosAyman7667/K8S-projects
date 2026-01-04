@@ -1,0 +1,19 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  creationTimestamp: null
+  name: vault-reviewer-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:auth-delegator
+subjects:
+- kind: ServiceAccount
+  name: vault-reviewer
+  namespace: bridgex
+
+#kubectl create token vault-reviewer -n bridgex --duration=720h
+# kubectl create clusterrolebinding vault-reviewer-binding \
+# --clusterrole=system:auth-delegator \
+# --serviceaccount=bridgex:vault-reviewer \
+# --dry-run=client -o yaml
