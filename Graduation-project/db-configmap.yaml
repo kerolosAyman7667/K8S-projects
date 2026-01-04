@@ -1,0 +1,7 @@
+apiVersion: v1
+data:
+  MYSQL_DATABASE: bridgex
+kind: ConfigMap
+metadata:
+  namespace: bridgex
+  name: db-cm

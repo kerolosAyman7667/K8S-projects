@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    app: backend-cache
+  name: backend-cache
+  namespace: bridgex
+spec:
+  serviceName: backend-cache-svc
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend-cache
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: backend-cache
+    spec:
+      containers:
+      - image: redis:alpine
+        name: redis
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 6379
+        resources: 
+          requests:
+            cpu: "0.2"
+            memory: 500Mi

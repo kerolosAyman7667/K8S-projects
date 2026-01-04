@@ -1,0 +1,10 @@
+I want to create CRD called UserHelper this resource will do the following
+- it takes user name and role or cluster role ref with namespace for the role and role type (enum clusterRole or Role)
+- resource creation will be rejected it the resource is not active in the Encryption at rest for k8s
+- after this the controller will create key and csr for the user then will create Certificate Signer request and approve it, it will save all of this at the ETCD
+- will create role binding or cluster role as specified in the CRD and will create service token 
+- it will search the roleRef and will give the user  view  to his service account or create token if he already has other service account in the role it will comply with it but at the end he should view or create token for his service account
+- after successful creation of the CRD is will create token by the user service account for 1 hour and save it in the status
+- the key and the crt will be saved in namespace called userhelpersecrets for each uer
+- in web UI each user can go enter their token and see their roles - create tokens - private key and the crt 
+- if admin login with his token he can view all of this and create resource from the UI 

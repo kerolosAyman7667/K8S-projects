@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata: 
+  name: backend-cm
+  namespace: bridgex
+data:
+  PORT: "8000"
+  JWTEXPIREDURATION: "9999"
+  JWTEXPIREDURATIONTYPE: h
+  EMAILHOST: localhost
+  EMAILPORT: "587"
+  CODETTLINMINUTES: "60"
+  NEXTTRYINSECONDS: "60"
+  FRONTEND_DOMAIN: localhost
+  FRONTEND_PORT: "80"
+  FRONTEND_PROTOCOL: http
+  FRONTEND_VERIFY_RELATIVE_URL: signUp/verifyEmail
+  AIBASEURL: http://nonexisturlnotvalid/api
+  GotenbergUrl: http://gotenberg-backend-svc.bridgex.svc.cluster.local:3001

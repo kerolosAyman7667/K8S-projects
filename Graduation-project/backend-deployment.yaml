@@ -1,0 +1,96 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: backend-deploy
+  name: backend-deploy
+  namespace: bridgex
+spec:
+  replicas: 4
+  selector:
+    matchLabels:
+      app: backend-deploy
+  strategy: 
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 50%
+      maxUnavailable: 1
+  template:
+    metadata:
+      labels:
+        app: backend-deploy
+    spec:
+      volumes:
+      - name: files-app
+        persistentVolumeClaim:
+          claimName: backend-app-pvc
+      - name: docs
+        persistentVolumeClaim:
+          claimName: backend-docs-pvc
+      - name: keys
+        secret:
+          secretName: backend-secret
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: "app"
+                      operator: In
+                      values: 
+                      - "backend-deploy"
+                topologyKey: kubernetes.io/hostname
+              weight: 1
+      # tolerations:
+      # - key: node-role.kubernetes.io/control-plane
+      #   operator: "Exists"
+      #   effect: NoSchedule
+      initContainers:
+      - name: populate-docs
+        image: bridgex/backend:39
+        imagePullPolicy: IfNotPresent
+        command: ["sh", "-c", "cp -r /app/docs/* /mnt/shared-docs/"]
+        volumeMounts:
+        - name: docs
+          mountPath: /mnt/shared-docs
+      - name: init-log-file
+        image: busybox
+        imagePullPolicy: IfNotPresent
+        command: ["sh", "-c", "touch /app/application.log"]
+        volumeMounts:
+        - name: files-app
+          mountPath: /app
+      containers:
+      - image: bridgex/backend:39
+        name: backend
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        - containerPort: 587
+        volumeMounts:
+          - mountPath: /app/files
+            name: files-app
+          - mountPath: /app/docs
+            name: docs
+            readOnly: true
+          - mountPath: /app/application.log
+            subPath: application.log
+            name: files-app
+          - mountPath: /app/public.pem
+            subPath: PUBLICKEY
+            name: keys
+            readOnly: true
+          - mountPath: /app/private.pem
+            subPath: PRIVATEKY
+            name: keys
+            readOnly: true
+        envFrom:
+          - configMapRef:
+              name: backend-cm
+          - secretRef:
+              name: backend-secret
+        resources: 
+          requests:
+            cpu: "0.1"
+            memory: 50Mi

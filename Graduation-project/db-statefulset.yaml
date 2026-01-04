@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    app: backend-db
+    db: mysql
+  name: backend-db
+  namespace: bridgex
+spec:
+  serviceName: db-svc
+  #setup volume to save data
+  volumeClaimTemplates:
+  - metadata:
+      name: mysql-data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      storageClassName: "freenas-nfs-csi"
+      resources:
+        requests:
+          storage: 500M
+  replicas: 1
+  podManagementPolicy: OrderedReady
+  selector:
+    matchLabels:
+      app: backend-db
+  template:
+    metadata:
+      labels:
+        app: backend-db
+    spec:
+      #get the config and map it so mysql use it
+      containers:
+      - image: mysql:8.0
+        imagePullPolicy: IfNotPresent
+        name: mysql
+        #set the ENV vars 
+        #TODO change to the Vault driver
+        envFrom:
+          - secretRef:
+              name: db-secret
+          - configMapRef:
+              name: db-cm
+        ports:
+        - containerPort: 3306
+          protocol: TCP
+        - containerPort: 33061 ##MySQL Group Replication or InnoDB Cluster setup. 
+          protocol: TCP
+        - containerPort: 33060
+          protocol: TCP
+        livenessProbe:
+          tcpSocket:
+            port: 3306
+        volumeMounts:
+          - mountPath: /var/lib/mysql
+            name: mysql-data
+        resources: 
+          requests:
+            cpu: "0.2"
+            memory: 500Mi

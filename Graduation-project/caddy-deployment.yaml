@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: null
+  labels:
+    app: caddy
+  name: caddy
+  namespace: bridgex
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: caddy
+  template:
+    metadata:
+      labels:
+        app: caddy
+    spec:
+      volumes:
+        - name: config
+          configMap:
+            name: caddy-cm
+        - name: docs
+          persistentVolumeClaim:
+            claimName: backend-docs-pvc
+      containers:
+      - image: caddy:latest
+        name: caddy
+        imagePullPolicy: IfNotPresent
+        volumeMounts:
+          - mountPath: /etc/caddy/Caddyfile
+            name: config
+            subPath: Caddyfile
+          - mountPath: /srv/docs
+            name: docs
+            readOnly: true
+        ports:
+        - containerPort: 80
+        - containerPort: 443
+        resources: 
+          requests:
+            memory: 10Mi
+            cpu: "0.05"
+          limits:
+            memory: 50Mi
+            cpu: "0.05"

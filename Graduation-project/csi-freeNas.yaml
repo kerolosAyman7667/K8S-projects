@@ -1,0 +1,98 @@
+csiDriver:
+  # should be globally unique for a given cluster
+  name: "org.democratic-csi.nfs"
+  fsGroupPolicy: File
+
+# add note here about volume expansion requirements
+storageClasses:
+  - name: freenas-nfs-csi
+    defaultClass: false
+    reclaimPolicy: Retain
+    volumeBindingMode: Immediate
+    allowVolumeExpansion: true
+    parameters:
+      # for block-based storage can be ext3, ext4, xfs
+      # for nfs should be nfs
+      fsType: nfs
+
+      # if true, volumes created from other snapshots will be
+      # zfs send/received instead of zfs cloned
+      # detachedVolumesFromSnapshots: "false"
+
+      # if true, volumes created from other volumes will be
+      # zfs send/received instead of zfs cloned
+      # detachedVolumesFromVolumes: "false"
+
+    mountOptions:
+      - noatime
+      - nfsvers=4
+    secrets:
+      provisioner-secret:
+      controller-publish-secret:
+      node-stage-secret:
+      node-publish-secret:
+      controller-expand-secret:
+
+# if your cluster supports snapshots you may enable below
+volumeSnapshotClasses: []
+#- name: freenas-nfs-csi
+#  parameters:
+#  # if true, snapshots will be created with zfs send/receive
+#  # detachedSnapshots: "false"
+#  secrets:
+#    snapshotter-secret:
+controller:
+  driver:
+    image:
+      tag: next
+
+node:
+  driver:
+    image:
+      tag: next
+
+driver:
+  config:
+    # please see the most up-to-date example of the corresponding config here:
+    # https://github.com/democratic-csi/democratic-csi/tree/master/examples
+    # YOU MUST COPY THE DATA HERE INLINE!
+    driver: freenas-nfs
+    instance_id:
+    httpConnection:
+      protocol: http
+      host: 192.168.1.39
+      port: 80
+      username: root
+      password: root #Yeah i know i am pushing a password to github i will fix this but not know 
+      allowInsecure: true
+    sshConnection:
+      host: 192.168.1.39
+      port: 22
+      username: root
+      # use either password or key
+      password: root
+    zfs:
+      cli:
+      sudoEnabled: true
+      paths:
+        zfs: /usr/sbin/zfs
+        zpool: /usr/sbin/zpool
+        sudo: /usr/bin/sudo
+        chroot: /usr/sbin/chroot
+        zfsBin: /usr/sbin/zfs
+      datasetParentName: pool1/all/nfsvol
+      detachedSnapshotsDatasetParentName: pool1/all/nfsvolsnap
+      datasetEnableQuotas: true
+      datasetEnableReservation: false
+      datasetPermissionsMode: "0777"
+      datasetPermissionsUser: 0
+      datasetPermissionsGroup: 0
+    nfs:
+      shareHost: 192.168.1.39
+      shareAlldirs: false
+      shareAllowedHosts: []
+      shareAllowedNetworks: []
+      shareMaprootUser: 0
+      shareMaprootGroup: 0
+      shareMapallUser: ""
+      shareMapallGroup: ""
