@@ -1,0 +1,49 @@
+flowchart TB
+    %% Actor represented as a circle or stadium shape
+    User(("End User"))
+
+    subgraph External ["External Infrastructure (VMs)"]
+        direction TB
+        Vault["HashiCorp Vault"]
+        TrueNAS["TrueNAS (NFS Storage)"]
+    end
+
+    subgraph Cluster ["Kubernetes Cluster (BridgeX)"]
+        direction TB
+        FE["Frontend (Nginx)"]
+        BE["Backend (Nest.js)"]
+        DB[("MySQL Database")]
+        Redis[("Redis Cache")]
+        PDF["Gotenberg Service"]
+        Caddy["Caddy (Docs Server)"]
+        %% Autoscalers
+        HPA[["HPA (CPU Scaling)"]]
+        VPA[["VPA (Mem/CPU Resizing)"]]
+    end
+
+    %% User Access
+    User -->|NodePort: 30092| FE
+    User -->|NodePort: 30090| Caddy
+
+    %% Internal Communication
+    FE -->|Proxy API & WebSocket :8000| BE
+    BE -->|:6379| Redis
+    BE -->|Query Data :3306| DB
+    BE -->|Generate PDF :3001| PDF
+
+    %% Autoscaling Logic
+    HPA -.-o|Scale Replicas| BE
+    VPA -.-o|Resize Resources| DB
+
+    %% Infrastructure Integration (The 'Hard Parts')
+    %% Dotted lines for secrets fetching
+    BE -.->|Fetch Secrets CSI| Vault
+    DB -.->|Fetch Root Pass CSI| Vault
+
+    %% Solid lines for NFS traffic
+    BE -->|Write Files & Docs| TrueNAS
+    Caddy -->|Read Shared Docs| TrueNAS
+    DB -->|Persist Data| TrueNAS
+    
+    %% Optional Styling for visual separation
+    class External,TrueNAS,Vault storage;

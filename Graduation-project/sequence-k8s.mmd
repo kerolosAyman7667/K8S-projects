@@ -1,0 +1,110 @@
+sequenceDiagram
+    autonumber
+    
+    box "External Infrastructure (VMs)" #f4f4f4
+        participant Vault as Vault VM<br/>(192.168.1.150)
+        participant TrueNAS as TrueNAS VM<br/>(192.168.1.39)
+    end
+
+    box "K8s Control Plane" #eef2ff
+        participant API as API Server / Scheduler
+        participant HPA as HPA Controller
+        participant VPA as VPA Recommender
+    end
+
+    box "K8s Node (Infrastructure Layer)" #e6fffa
+        participant Kubelet as Kubelet Agent
+        participant CSIVault as CSI Driver (Vault)
+        participant CSINFS as CSI Driver (NFS)
+        participant KubeProxy as Kube-Proxy / CNI
+    end
+
+    box "Workloads (Pods)" #fffaf0
+        participant FE as Frontend (Nginx)
+        participant BE as Backend (Node)
+        participant DB as MySQL (StatefulSet)
+        participant Caddy as Caddy (Docs)
+    end
+
+    %% --- SECTION 1: INFRASTRUCTURE PROVISIONING (Startup) ---
+    note over API, DB: 1. Infrastructure Binding (The "Hard Parts")
+    
+    API->>Kubelet: Schedule Pod (Backend/DB)
+    
+    rect rgb(5, 5, 5)
+        note right of Kubelet: Volume Mounting Phase
+        
+        %% Vault Secret Injection
+        Kubelet->>CSIVault: Mount Volume 'vault-sec'
+        CSIVault->>Vault: Authenticate (K8s SA) & Fetch Secrets
+        Vault-->>CSIVault: Return Secrets (DB Creds, Keys)
+        CSIVault->>Kubelet: Mount tmpfs at /mnt/secrets-store
+        CSIVault->>API: Sync to K8s Secret (backend-vault-synced-secret)
+        
+        %% NFS Storage Attachment
+        Kubelet->>CSINFS: Mount PVC 'backend-docs-pvc' (RWX)
+        CSINFS->>TrueNAS: Ensure Export / NFS Handle
+        TrueNAS-->>CSINFS: Ready
+        CSINFS->>Kubelet: Mount NFS Share at /app/docs
+    end
+
+    Kubelet->>BE: Start Container
+    activate BE
+    
+    %% --- SECTION 2: SHARED STORAGE PATTERN ---
+    note over BE, Caddy: 2. Shared Storage Pattern (ReadWriteMany)
+    
+    BE->>TrueNAS: (Init-Container) Write Docs to NFS
+    note right of BE: Backend populates shared volume
+    
+    API->>Kubelet: Schedule Caddy Pod
+    Kubelet->>CSINFS: Mount Same PVC 'backend-docs-pvc'
+    CSINFS->>TrueNAS: Connect to existing NFS Share
+    Kubelet->>Caddy: Start Container
+    activate Caddy
+    
+    %% --- SECTION 3: NETWORKING & TRAFFIC ---
+    note over KubeProxy, DB: 3. Service Networking
+    
+    actor User
+    User->>KubeProxy: NodePort (30092)
+    KubeProxy->>FE: Route to Frontend Pod
+    activate FE
+    
+    FE->>KubeProxy: API Request (backend-svc:8000)
+    note right of FE: Nginx Reverse Proxy (frontend-cm)
+    KubeProxy->>BE: Route to ClusterIP
+    
+    BE->>DB: DB Connection (mysql-data PVC)
+    activate DB
+    DB->>TrueNAS: Read/Write Data (NFS Persistence)
+    deactivate DB
+    
+    BE-->>FE: Response
+    deactivate FE
+
+    User->>KubeProxy: Request Docs (NodePort: 30090)
+    KubeProxy->>Caddy: Route to Caddy
+    Caddy->>TrueNAS: Read from Shared NFS
+    Caddy-->>User: Return Static File
+    
+    %% --- SECTION 4: AUTOSCALING INFRASTRUCTURE ---
+    note over API, DB: 4. Hybrid Autoscaling (HPA & VPA)
+    
+    alt
+        note right of HPA: Stateless Scaling (CPU)
+        HPA->>API: Check Backend CPU Metrics
+        HPA->>API: Scale Deployment (Replicas 1 -> 2)
+        note right of HPA: Stabilization Window: 10s (No Thrashing)
+        API->>Kubelet: Schedule New Backend Pod
+    end
+
+    rect rgb(5, 5, 5)
+        note right of VPA: Stateful Scaling (Memory)
+        VPA->>API: Check MySQL Memory Usage
+        VPA->>API: Recommendation: Increase Request 500Mi -> 1Gi
+        API->>DB: Evict Pod (UpdateMode: Recreate)
+        %% REMOVED: deactivate DB (This was causing the error as DB was already inactive)
+        API->>Kubelet: Restart DB with new Resources
+        activate DB
+    end
